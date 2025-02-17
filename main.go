@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/emersion/go-imap"
-	"github.com/mbndr/figlet4go"
 	"github.com/emersion/go-imap/client"
+	"github.com/mbndr/figlet4go"
 	"github.com/schollz/progressbar/v3"
 )
 
@@ -21,7 +21,7 @@ var (
 	checkedCount uint64
 	liveCount    uint64
 	totalCount   uint64
-	bar         *progressbar.ProgressBar
+	bar          *progressbar.ProgressBar
 	messageMutex sync.Mutex
 )
 
@@ -124,7 +124,7 @@ func appendToMessages(content string) {
 func processAccount(cred Credential, wg *sync.WaitGroup, liveChan chan<- string) {
 	defer func() {
 		atomic.AddUint64(&checkedCount, 1)
-		desc := fmt.Sprintf("[cyan]Checked:[reset] %d [green]Live:[reset] %d [yellow]Total:[reset] %d", 
+		desc := fmt.Sprintf("[cyan]Checked:[reset] %d [green]Live:[reset] %d [yellow]Total:[reset] %d",
 			atomic.LoadUint64(&checkedCount),
 			atomic.LoadUint64(&liveCount),
 			atomic.LoadUint64(&totalCount))
@@ -149,6 +149,12 @@ func processAccount(cred Credential, wg *sync.WaitGroup, liveChan chan<- string)
 	for _, sender := range senders {
 		criteria := imap.NewSearchCriteria()
 		criteria.Header.Add("From", sender)
+
+		// Add date criteria for 2025
+		since := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+		before := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+		criteria.Since = since
+		criteria.Before = before
 
 		if uids, err := c.Search(criteria); err == nil {
 			totalMessages[sender] = len(uids)
@@ -177,22 +183,26 @@ func processAccount(cred Credential, wg *sync.WaitGroup, liveChan chan<- string)
 								fromEmail = addr
 							}
 						}
-						
-						detail := fmt.Sprintf("\nFrom Name: %s\nFrom Email: %s\nTo: %s\nSubject: %s\nDate: %s\nAccount: %s\n---",
-							fromName,
-							fromEmail,
-							cred.Email,
-							msg.Envelope.Subject,
-							msg.Envelope.Date.Format("2006-01-02 15:04:05"),
-							cred.Email)
-						messageDetails = append(messageDetails, detail)
+
+						// Ensure the message is from 2025
+						if msg.Envelope.Date.Year() == 2025 {
+							detail := fmt.Sprintf("\nFrom Name: %s\nFrom Email: %s\nTo: %s\nSubject: %s\nDate: %s\nAccount: %s\n---",
+								fromName,
+								fromEmail,
+								cred.Email,
+								msg.Envelope.Subject,
+								msg.Envelope.Date.Format("2006-01-02 15:04:05"),
+								cred.Email)
+							messageDetails = append(messageDetails, detail)
+						}
 					}
 				}
 				<-done
 
 				if len(messageDetails) > 0 {
-					content := fmt.Sprintf("\n\n=== Messages from %s ===\n%s\n", 
+					content := fmt.Sprintf("\n\n=== Messages from %s ===\n%s\n",
 						sender, strings.Join(messageDetails, "\n"))
+					// Only append messages from the specified senders and year
 					appendToMessages(content)
 				}
 			}
@@ -225,7 +235,7 @@ func main() {
 	// Initialize screen and show header
 	fmt.Printf("\033[2J") // Clear screen
 	fmt.Printf("\033[H")  // Move cursor to top
-	
+
 	// Create figlet
 	ascii := figlet4go.NewAsciiRender()
 	options := figlet4go.NewRenderOptions()
@@ -234,10 +244,10 @@ func main() {
 	}
 	renderStr, _ := ascii.RenderOpts("EZ Mail", options)
 	fmt.Println(renderStr)
-	
+
 	// Show author and time
 	loc, _ := time.LoadLocation("Asia/Jakarta")
-	fmt.Printf("\033[36m@agp0x\033[0m | \033[33m%s WIB\033[0m\n\n", time.Now().In(loc).Format("15:04:05"))
+	fmt.Printf("\033[36m Made by @agp0x\033[0m | \033[33m%s WIB\033[0m\n\n", time.Now().In(loc).Format("15:04:05"))
 	bar = progressbar.NewOptions(len(credentials),
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowCount(),
